@@ -91,6 +91,13 @@ found:
 
   release(&ptable.lock);
 
+
+  //ASSIGNMENT TASK 1
+  acquire(&tickslock);
+  p->ctime = ticks;
+  p->rtime = 0;
+  release(&tickslock);
+
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
@@ -263,6 +270,13 @@ exit(void)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
+
+  // ASSIGNMENT TASK 1
+  // Assumes curproc->state = ZOMBIE means end.
+  acquire(&tickslock);
+  p->etime = ticks;
+  release(&tickslock);
+
   sched();
   panic("zombie exit");
 }
@@ -311,6 +325,27 @@ wait(void)
   }
 }
 
+
+// ASSIGNMENT TASK 1
+int 
+waitx(int* wtime, int* rtime){
+  
+  acquire(&tickslock);
+  uint wstime = ticks;
+  release(&tickslock);
+
+  int ret = wait();
+
+  acquire(&tickslock);
+  *wtime = ticks - wstime;
+  release(&tickslock);
+
+  *rtime = myproc()->rtime;
+  
+  return ret;
+}
+
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -342,7 +377,6 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-
       swtch(&(c->scheduler), p->context);
       switchkvm();
 

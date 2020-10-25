@@ -37,9 +37,8 @@ void
 trap(struct trapframe *tf)
 {
   if(tf->trapno == T_SYSCALL){
-    if(myproc()->killed){
+    if(myproc()->killed)
       exit();
-    }
     myproc()->tf = tf;
     syscall();
     if(myproc()->killed)
@@ -52,7 +51,6 @@ trap(struct trapframe *tf)
     if(cpuid() == 0){
       acquire(&tickslock);
       ticks++;
-      myproc()->rtime++;
       wakeup(&ticks);
       release(&tickslock);
     }

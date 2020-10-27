@@ -10,6 +10,11 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+enum scheduler_type{RR, FCFS};
+
+// main.c
+extern enum scheduler_type SCHEDULER;
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -118,6 +123,7 @@ void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
 int             wait(void);
+int             waitx(int *wtime, int *rtime);
 void            wakeup(void*);
 void            yield(void);
 

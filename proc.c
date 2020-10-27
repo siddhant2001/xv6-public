@@ -89,14 +89,16 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
-  release(&ptable.lock);
-
-
   //ASSIGNMENT TASK 1
   acquire(&tickslock);
   p->ctime = ticks;
   p->rtime = 0;
   release(&tickslock);
+
+  release(&ptable.lock);
+
+
+
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
@@ -254,6 +256,11 @@ exit(void)
   end_op();
   curproc->cwd = 0;
 
+
+  acquire(&tickslock);
+  curproc->etime = ticks;
+  release(&tickslock);
+
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
@@ -273,9 +280,7 @@ exit(void)
 
   // ASSIGNMENT TASK 1
   // Assumes curproc->state = ZOMBIE means end.
-  acquire(&tickslock);
-  p->etime = ticks;
-  release(&tickslock);
+  
 
   sched();
   panic("zombie exit");
@@ -309,6 +314,10 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+
+        p->ctime = 0;
+        p->rtime = 0;
+        p->etime = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -330,19 +339,87 @@ wait(void)
 int 
 waitx(int* wtime, int* rtime){
   
-  acquire(&tickslock);
-  uint wstime = ticks;
-  release(&tickslock);
-
-  int ret = wait();
-
-  acquire(&tickslock);
-  *wtime = ticks - wstime;
-  release(&tickslock);
-
-  *rtime = myproc()->rtime;
+  struct proc *p;
+  int havekids, pid;
+  struct proc *curproc = myproc();
   
-  return ret;
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        *wtime = p->etime - p->ctime - p->rtime; // change
+        *rtime = p->rtime;
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+
+        p->ctime = 0;
+        p->rtime = 0;
+        p->etime = 0;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+
+}
+
+
+
+
+void
+scheduler_rr(void){
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&ptable.lock);
+
+  }
 }
 
 
@@ -388,6 +465,37 @@ scheduler(void)
 
   }
 }
+  // struct proc *p;
+  // struct cpu *c = mycpu();
+  // c->proc = 0;
+  
+  // for(;;){
+  //   // Enable interrupts on this processor.
+  //   sti();
+
+  //   // Loop over process table looking for process to run.
+  //   acquire(&ptable.lock);
+  //   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  //     if(p->state != RUNNABLE)
+  //       continue;
+
+  //     // Switch to chosen process.  It is the process's job
+  //     // to release ptable.lock and then reacquire it
+  //     // before jumping back to us.
+  //     c->proc = p;
+  //     switchuvm(p);
+  //     p->state = RUNNING;
+  //     swtch(&(c->scheduler), p->context);
+  //     switchkvm();
+
+  //     // Process is done running for now.
+  //     // It should have changed its p->state before coming back.
+  //     c->proc = 0;
+  //   }
+  //   release(&ptable.lock);
+
+  // }
+
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores

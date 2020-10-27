@@ -51,6 +51,10 @@ trap(struct trapframe *tf)
     if(cpuid() == 0){
       acquire(&tickslock);
       ticks++;
+
+      if(myproc() != 0)
+        myproc()->rtime++;
+
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -104,7 +108,15 @@ trap(struct trapframe *tf)
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
-    yield();
+    // ASSIGNMENT TASK 2
+    switch (SCHEDULER)
+    {
+    case FCFS:
+      // To make process non-preemptive
+      break;
+    default:
+      yield();
+    }
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)

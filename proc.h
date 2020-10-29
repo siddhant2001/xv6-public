@@ -42,6 +42,9 @@ struct proc {
   uint ctime;
   uint rtime;
   uint etime;
+  uint wtime;
+  int n_run;
+  int priority;
 
   pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process

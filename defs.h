@@ -126,6 +126,7 @@ int             wait(void);
 int             waitx(int *wtime, int *rtime);
 void            wakeup(void*);
 void            yield(void);
+void            ps(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

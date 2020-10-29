@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
   }
   for (j = 0; j < number_of_processes+5; j++)
   {
-    wait();
+    // wait();
   }
   exit();
 }

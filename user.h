@@ -26,6 +26,7 @@ int uptime(void);
 
 // ASSIGNMENT TASK 1
 int waitx(int *wtime, int *rtime);
+void ps(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

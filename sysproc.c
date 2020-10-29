@@ -40,6 +40,13 @@ sys_waitx(void)
 }
 
 int
+sys_ps(void)
+{
+  ps();
+  return 0;
+}
+
+int
 sys_kill(void)
 {
   int pid;

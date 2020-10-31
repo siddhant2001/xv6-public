@@ -10,7 +10,7 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
-enum scheduler_type{RR, FCFS};
+enum scheduler_type{RR, FCFS, PBS, MLFQ};
 
 // main.c
 extern enum scheduler_type SCHEDULER;
@@ -126,7 +126,9 @@ int             wait(void);
 int             waitx(int *wtime, int *rtime);
 void            wakeup(void*);
 void            yield(void);
+void            demote_queue(int old_q, int new_q, struct proc *p);
 void            ps(void);
+int             set_priority(int, int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

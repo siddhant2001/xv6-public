@@ -43,6 +43,12 @@ struct proc {
   uint rtime;
   uint etime;
   uint wtime;
+  int ts_rtime;
+  int time_slice;
+
+  int to_add;
+  int cur_q;
+
   int n_run;
   int priority;
 

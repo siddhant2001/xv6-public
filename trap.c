@@ -56,6 +56,7 @@ trap(struct trapframe *tf)
     }
     if(myproc() != 0){
       myproc()->rtime++;
+      myproc()->ts_rtime++;
     }
     lapiceoi();
     break;
@@ -112,6 +113,12 @@ trap(struct trapframe *tf)
     {
     case FCFS:
       // To make process non-preemptive
+      break;
+    case MLFQ:
+      if(myproc()->ts_rtime >= myproc()->time_slice){
+        demote_queue(myproc()->cur_q, myproc()->cur_q+1, myproc());
+        yield();
+      }
       break;
     default:
       yield();

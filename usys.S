@@ -32,3 +32,4 @@ SYSCALL(sleep)
 SYSCALL(uptime)
 
 SYSCALL(ps)
+SYSCALL(set_priority)

@@ -10,6 +10,13 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+enum scheduler_type{RR, FCFS, PBS, MLFQ};
+
+// void            save(void);
+
+// main.c
+extern enum scheduler_type SCHEDULER;
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -118,8 +125,15 @@ void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
 int             wait(void);
+int             waitx(int *wtime, int *rtime);
 void            wakeup(void*);
 void            yield(void);
+void            demote_queue(int old_q, int new_q, struct proc *p);
+void            ps(void);
+int             set_priority(int, int);
+void            increment_wait();
+void            print_timeVpid(void);
+void            current_ticks(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

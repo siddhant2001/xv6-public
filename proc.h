@@ -37,6 +37,25 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
+
+  // ASSIGNMENT TASK 1
+  uint ctime;
+  uint rtime;
+  uint etime;
+  uint wtime;
+  uint qwtime;
+  uint stime;
+  uint qticks[5];
+
+  int ts_rtime;
+  int time_slice;
+
+  int to_add;
+  int cur_q;
+
+  int n_run;
+  int priority;
+
   pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state

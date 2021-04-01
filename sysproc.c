@@ -27,6 +27,30 @@ sys_wait(void)
 }
 
 int
+sys_waitx(void)
+{
+  int *wtime, *rtime;
+
+  if( argptr(0, (char **)&wtime, sizeof(int)) == -1 ||
+  argptr(1, (char **)&rtime, sizeof(int)) == -1)
+    return -1;
+  return waitx((int*) wtime, (int*) rtime);
+}
+
+int
+sys_current_ticks(void)
+{
+  return ticks;
+}
+
+int
+sys_ps(void)
+{
+  ps();
+  return 0;
+}
+
+int
 sys_kill(void)
 {
   int pid;
@@ -88,4 +112,16 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+
+int sys_set_priority(void){
+  int pid, new_priority;
+  if(argint(0, &new_priority) < 0)
+    return -1;
+  if(argint(1, &pid) < 0)
+    return -1;
+  
+  // cprintf("%d %d\n", pid, new_priority);
+  return set_priority(new_priority, pid);
 }

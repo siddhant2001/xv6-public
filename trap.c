@@ -13,6 +13,7 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
+uint CPU_interrupts[100];
 
 void
 tvinit(void)
@@ -52,8 +53,22 @@ trap(struct trapframe *tf)
       acquire(&tickslock);
       ticks++;
       wakeup(&ticks);
+      if(ticks%100==0 && LOGS && SCHEDULER!=MLFQ){
+        print_timeVpid();
+      }
+      increment_wait();
       release(&tickslock);
     }
+    CPU_interrupts[cpuid()] += 1;
+    // if(LOGS){
+    //   cprintf("\nYEEETCPU: %d %d %d ", cpuid(), ticks, CPU_interrupts[cpuid()]);
+    // }
+    // cprintf("tf->trapnp = T_IRQ0 + IRQ_TIMER on cpu %d\n", cpuid());
+    // if(myproc() != 0 && myproc()->state == RUNNING){
+    //   myproc()->rtime++;
+    //   myproc()->ts_rtime++;
+    //   myproc()->qticks[myproc()->cur_q]++;
+    // }
     lapiceoi();
     break;
   case T_IRQ0 + IRQ_IDE:
@@ -103,10 +118,25 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
-     tf->trapno == T_IRQ0+IRQ_TIMER)
-    yield();
-
+     tf->trapno == T_IRQ0+IRQ_TIMER){
+    // ASSIGNMENT TASK 2
+    switch (SCHEDULER)
+    {
+    case FCFS:
+      // To make process non-preemptive
+      break;
+    case MLFQ:
+      if(myproc()->ts_rtime >= myproc()->time_slice){
+        // demote_queue(myproc()->cur_q, myproc()->cur_q+1, myproc());
+        yield();
+      }
+      break;
+    default:
+      yield();
+    }
+  }
   // Check if the process has been killed since we yielded
-  if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
+  if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER){
     exit();
+  }
 }

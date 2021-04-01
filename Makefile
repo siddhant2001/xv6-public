@@ -71,16 +71,23 @@ QEMU = $(shell if which qemu > /dev/null; \
 	echo "***" 1>&2; exit 1)
 endif
 
-CC = $(TOOLPREFIX)gcc
+ifndef LOGS
+LOGS := 0
+else
+LOGS := 1
+endif
+
+SCHEDFLAG = -D SCHED=$(SCHEDULER) -D LOGS=$(LOGS)
+CC = $(TOOLPREFIX) gcc $(SCHEDFLAG) 
 AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer
+CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -fno-omit-frame-pointer
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''
-LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
+LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1) 
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
@@ -181,6 +188,11 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
+	_benchmark\
+	_ps\
+	_time\
+	_setPriority\
+	_saveFile\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -228,7 +240,10 @@ qemu-memfs: xv6memfs.img
 	$(QEMU) -drive file=xv6memfs.img,index=0,media=disk,format=raw -smp $(CPUS) -m 256
 
 qemu-nox: fs.img xv6.img
-	$(QEMU) -nographic $(QEMUOPTS)
+	$(QEMU) -nographic $(QEMUOPTS) | tee log.txt
+	
+# qemu-nox-log: fs.img xv6.img
+# 	$(QEMU) -nographic $(QEMUOPTS) | tee log.txt
 
 .gdbinit: .gdbinit.tmpl
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
@@ -250,8 +265,8 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
-	printf.c umalloc.c\
-	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
+	printf.c umalloc.c benchmark.c ps.c time.c setPriority.c saveFile.c\
+	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list logs.txt\
 	.gdbinit.tmpl gdbutil\
 
 dist:

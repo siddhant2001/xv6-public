@@ -71,7 +71,13 @@ QEMU = $(shell if which qemu > /dev/null; \
 	echo "***" 1>&2; exit 1)
 endif
 
-SCHEDFLAG = -D SCHED=$(SCHEDULER)
+ifndef LOGS
+LOGS := 0
+else
+LOGS := 1
+endif
+
+SCHEDFLAG = -D SCHED=$(SCHEDULER) -D LOGS=$(LOGS)
 CC = $(TOOLPREFIX) gcc $(SCHEDFLAG) 
 AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
@@ -186,6 +192,7 @@ UPROGS=\
 	_ps\
 	_time\
 	_setPriority\
+	_saveFile\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -233,7 +240,10 @@ qemu-memfs: xv6memfs.img
 	$(QEMU) -drive file=xv6memfs.img,index=0,media=disk,format=raw -smp $(CPUS) -m 256
 
 qemu-nox: fs.img xv6.img
-	$(QEMU) -nographic $(QEMUOPTS)
+	$(QEMU) -nographic $(QEMUOPTS) | tee log.txt
+	
+# qemu-nox-log: fs.img xv6.img
+# 	$(QEMU) -nographic $(QEMUOPTS) | tee log.txt
 
 .gdbinit: .gdbinit.tmpl
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
@@ -255,8 +265,8 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
-	printf.c umalloc.c benchmark.c ps.c time.c setPriority.c\
-	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
+	printf.c umalloc.c benchmark.c ps.c time.c setPriority.c saveFile.c\
+	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list logs.txt\
 	.gdbinit.tmpl gdbutil\
 
 dist:

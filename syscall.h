@@ -23,5 +23,6 @@
 
 // ASSIGNMENT TASK 1
 #define SYS_waitx 22
-#define SYS_ps 22
-#define SYS_set_priority 23
+#define SYS_ps 23
+#define SYS_set_priority 24
+#define SYS_current_ticks 25

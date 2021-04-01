@@ -33,3 +33,4 @@ SYSCALL(uptime)
 
 SYSCALL(ps)
 SYSCALL(set_priority)
+SYSCALL(current_ticks)

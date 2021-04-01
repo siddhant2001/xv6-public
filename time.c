@@ -14,9 +14,11 @@ int main(int argc, char *argv[]) {
     }
     else{
         int wtime, rtime;
+        int start_ticks = current_ticks();
         waitx(&wtime, &rtime);
-        printf(1, "Ran for: %d ticks\n", rtime);
-        printf(1, "Waited for: %d ticks\n", wtime);
+        printf(1, "Rtime: %d ticks\n", rtime);
+        printf(1, "wtime: %d ticks\n", wtime);
+        printf(1, "Total time: %d ticks\n", current_ticks()-start_ticks);
         exit();
     }
 }

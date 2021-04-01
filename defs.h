@@ -12,6 +12,8 @@ struct superblock;
 
 enum scheduler_type{RR, FCFS, PBS, MLFQ};
 
+// void            save(void);
+
 // main.c
 extern enum scheduler_type SCHEDULER;
 
@@ -129,6 +131,9 @@ void            yield(void);
 void            demote_queue(int old_q, int new_q, struct proc *p);
 void            ps(void);
 int             set_priority(int, int);
+void            increment_wait();
+void            print_timeVpid(void);
+void            current_ticks(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

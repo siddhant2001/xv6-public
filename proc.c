@@ -6,6 +6,8 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "fcntl.h"
+
 
 struct {
   struct spinlock lock;
@@ -22,6 +24,25 @@ int ptrs[5][2] = {
   {0, 0}
 };
 
+void print_timeVpid(void){
+  acquire(&ptable.lock);
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid < 3)
+      continue;
+    if(p->state == RUNNING){
+      cprintf("\nYEEET: %d %d RUNNING ", p->pid, ticks);
+    }
+    else if(p->state == SLEEPING){
+      cprintf("\nYEEET: %d %d SLEEPING ", p->pid, ticks);
+    }
+    else if(p->state == RUNNABLE){
+      cprintf("\nYEEET: %d %d RUNNABLE ", p->pid, ticks);
+    }
+  }
+  release(&ptable.lock);
+}
+
 void enqueue(int q_num, int pid){
   queues[q_num][ptrs[q_num][1]] = pid;
   ptrs[q_num][1] = (ptrs[q_num][1]+1)%NPROC;
@@ -34,7 +55,8 @@ void dequeue(int q_num){
 void demote_queue(int old_q, int new_q, struct proc *p){
   if(new_q>4)
     new_q=4;
-  
+  if(new_q<0)
+    new_q=0;
 
   int start_shifting=0, i, q=p->cur_q;
 
@@ -54,16 +76,61 @@ void demote_queue(int old_q, int new_q, struct proc *p){
 
   ptrs[q][1] = (ptrs[q][1]-1+NPROC)%NPROC;
 
-
-
-
-
+  p->qwtime=0;
   p->ts_rtime=0;
   p->cur_q=new_q;
 
+  int ts=1;
+
+  for(i=0; i<new_q; i++)
+    ts *= 2;
+
+  p->time_slice = ts;
+  p->qwtime=0;
+
   if(new_q<=4)
     enqueue(new_q, p->pid);
+
+  if(LOGS && p->pid > 2){
+    // cprintf("%d %d\n", p->cur_q, p->time_slice);
+    cprintf("\nYEEET: %d %d %d.9 ", p->pid, old_q, ticks-1);
+    cprintf("\nYEEET: %d %d %d ", p->pid, p->cur_q, ticks);
+  }
+  
 }
+
+void increment_wait(){
+  struct proc *p;
+
+  acquire(&ptable.lock);  
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state==RUNNABLE){
+      p->wtime+=1;
+      p->stime+=1;
+      p->qwtime+=1;
+
+      if(SCHEDULER==MLFQ){
+        if(p->qwtime > 50 && p->cur_q != 0){
+          // cprintf("Promotion\n");
+          demote_queue(p->cur_q, p->cur_q-1, p);
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < ncpu; ++i) {
+    p = cpus[i].proc;
+    if(p==0 || p->state != RUNNING)
+      continue;
+    p->rtime++;
+    p->ts_rtime++;
+    p->qticks[p->cur_q]++;
+  }
+
+  release(&ptable.lock);  
+}
+
 
 static struct proc *initproc;
 
@@ -152,13 +219,17 @@ found:
   p->n_run=0;
   p->priority=60;
   p->wtime=0;
+  p->qwtime=0;
+  p->stime=0;
   p->to_add=1;  
   p->cur_q=0;
   p->time_slice=1;
+  for(int i=0; i<5; i++)
+    p->qticks[i]=0;
+
+  p->qticks[0]=0;
 
   release(&ptable.lock);
-
-
 
 
   // Allocate kernel stack.
@@ -450,7 +521,7 @@ waitx(int* wtime, int* rtime){
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
-        *wtime = p->etime - p->ctime - p->rtime; // change
+        *wtime = p->wtime; // change
         *rtime = p->rtime;
         pid = p->pid;
         kfree(p->kstack);
@@ -537,10 +608,13 @@ scheduler(void)
   uint min_priori;
   c->proc = 0;
   int qnum, sel_pid, to_break, qt, i;
+  int ticks_done=-1;
 
   for(;;){
     // Enable interrupts on this processor.
     sti();
+
+    
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
@@ -608,6 +682,9 @@ scheduler(void)
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
           if(p->to_add){
             enqueue(0, p->pid);
+            if(LOGS && SCHEDULER==MLFQ && p->pid>2){
+              cprintf("\nYEEET: %d %d %d ", p->pid, p->cur_q, ticks);
+            }
             p->to_add=0;
           }
         }
@@ -701,6 +778,7 @@ sched(void)
     panic("sched interruptible");
   intena = mycpu()->intena;
   // cprintf("Switching to scheduler\n");
+
   swtch(&p->context, mycpu()->scheduler);
   mycpu()->intena = intena;
 }
@@ -711,6 +789,9 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  // cprintf("%s Yield hua hai!\n", myproc()->name);
+  if(SCHEDULER==MLFQ)
+    demote_queue(myproc()->cur_q, myproc()->cur_q+1, myproc());
   sched();
   release(&ptable.lock);
 }
@@ -789,6 +870,9 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+
+  if(SCHEDULER==MLFQ)
+    demote_queue(myproc()->cur_q, myproc()->cur_q, myproc());
 
   sched();
 
@@ -897,8 +981,13 @@ ps(void){
   struct proc *p;
   char *state;
 
-  cprintf("PID\tPRIORITY\tSTATE\t\trtime\twtime\tn_run\n");
-
+  cprintf("PID\tPRIORITY\tSTATE\t\trtime\twtime\tn_run\tcur_q\tq0\tq1\tq2\tq3\tq4\n");
+  int x=1;
+  for(int i=0; i<=1000000000; i++){
+    // cprintf("\t|");
+    x *= ticks; 
+  }
+  cprintf("%d\n", x);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state == UNUSED)
       continue;
@@ -906,7 +995,46 @@ ps(void){
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d", p->pid, p->priority, state, p->rtime, p->wtime, p->n_run);
+    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d", p->pid, p->priority, state, p->rtime, p->qwtime, p->n_run, p->cur_q);
+    for(int i=0; i<5; i++){
+      cprintf("\t%d", p->qticks[i]);
+    }
+    cprintf("\n");
+  }
+}
+
+
+void
+ps1(void){
+  static char *states[] = {
+  [UNUSED]    " unused ",
+  [EMBRYO]    " embryo ",
+  [SLEEPING]  "sleeping",
+  [RUNNABLE]  "runnable",
+  [RUNNING]   "running ",
+  [ZOMBIE]    " zombie "
+  };
+  struct proc *p;
+  char *state;
+
+  cprintf("PID\tPRIORITY\tSTATE\t\trtime\twtime\tn_run\tcur_q\tq0\tq1\tq2\tq3\tq4\n");
+  int x=1;
+  for(int i=0; i<=1000000000; i++){
+    // cprintf("\t|");
+    x *= ticks; 
+  }
+  cprintf("%d\n", x);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+      state = states[p->state];
+    else
+      state = "???";
+    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d", p->pid, p->priority, state, p->rtime, p->qwtime, p->n_run, p->cur_q);
+    for(int i=0; i<5; i++){
+      cprintf("\t%d", p->qticks[i]);
+    }
     cprintf("\n");
   }
 }

@@ -34,9 +34,13 @@ sys_waitx(void)
   if( argptr(0, (char **)&wtime, sizeof(int)) == -1 ||
   argptr(1, (char **)&rtime, sizeof(int)) == -1)
     return -1;
-
-
   return waitx((int*) wtime, (int*) rtime);
+}
+
+int
+sys_current_ticks(void)
+{
+  return ticks;
 }
 
 int
@@ -118,6 +122,6 @@ int sys_set_priority(void){
   if(argint(1, &pid) < 0)
     return -1;
   
-  cprintf("%d %d\n", pid, new_priority);
+  // cprintf("%d %d\n", pid, new_priority);
   return set_priority(new_priority, pid);
 }

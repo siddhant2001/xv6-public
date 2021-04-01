@@ -13,6 +13,7 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
+uint CPU_interrupts[100];
 
 void
 tvinit(void)
@@ -52,12 +53,22 @@ trap(struct trapframe *tf)
       acquire(&tickslock);
       ticks++;
       wakeup(&ticks);
+      if(ticks%100==0 && LOGS && SCHEDULER!=MLFQ){
+        print_timeVpid();
+      }
+      increment_wait();
       release(&tickslock);
     }
-    if(myproc() != 0){
-      myproc()->rtime++;
-      myproc()->ts_rtime++;
-    }
+    CPU_interrupts[cpuid()] += 1;
+    // if(LOGS){
+    //   cprintf("\nYEEETCPU: %d %d %d ", cpuid(), ticks, CPU_interrupts[cpuid()]);
+    // }
+    // cprintf("tf->trapnp = T_IRQ0 + IRQ_TIMER on cpu %d\n", cpuid());
+    // if(myproc() != 0 && myproc()->state == RUNNING){
+    //   myproc()->rtime++;
+    //   myproc()->ts_rtime++;
+    //   myproc()->qticks[myproc()->cur_q]++;
+    // }
     lapiceoi();
     break;
   case T_IRQ0 + IRQ_IDE:
@@ -116,7 +127,7 @@ trap(struct trapframe *tf)
       break;
     case MLFQ:
       if(myproc()->ts_rtime >= myproc()->time_slice){
-        demote_queue(myproc()->cur_q, myproc()->cur_q+1, myproc());
+        // demote_queue(myproc()->cur_q, myproc()->cur_q+1, myproc());
         yield();
       }
       break;
